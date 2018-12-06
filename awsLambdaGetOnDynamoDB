@@ -1,0 +1,48 @@
+import json
+import boto3 #boto3 is how we connect to other aws services like dynamodb below
+''' 
+    Luke Simmons
+    2018-12-5
+    
+    This function can be triggered by an API Gateway API resource's GET method, be sure to check the box for 
+    Lambda Proxy Integration.
+    It will GET information from a DynamoDB table via a query string using a table name and partition key
+    to get a specific row from the table.
+    Can be tested by setting this function as an API Gateway GET trigger and testing that GET method like so:
+    TableName=YourTableName&yourPartitionKeyName=1
+'''
+def lambda_handler(event, context):
+    # TODO implement
+   client = boto3.client('dynamodb') #establish a connection to dynamodb
+   
+   print("the event is: ", event)#for visual understanding only send a log to cloudwatch with (the entire event)
+   
+   tableNameKey = event['queryStringParameters']['TableName'] #this command is looking for a "TableName" to be queried in
+   print("Using table name: ", tableNameKey) #for visual understanding only send a log to cloudwatch to see what TableName we got from the query 
+   partitionKeyID = str(event['queryStringParameters']['employeeId'])##this command is looking for a "employeeId" to be queried in, then to output from lambda,
+                                                                        #structure has to be JSON which means this needs to be converted to a string
+   print("Using partition key: ", partitionKeyID)#for visual understanding only send a log to cloudwatch to see what partitionKeyID we got from the query
+   
+   out = {} #initialize a dictionary variable 
+   #to output from lambda to API Gateway, we need 4 keys in our dictionary variable
+   out['statusCode'] = 200 #we need a status code
+   out['isBase64Encoded'] = "false" #we need a boolean 'isBase64Encoded'
+   out['headers'] = {"my_header": "my_value"} #need a dictionary of headers
+   itemWithMetadata = client.get_item(TableName = tableNameKey, Key = {"EMPLOYEE_ID":{'N':partitionKeyID}}) #set a variable to get_item, when calling getitem from .client, we need to pass in the table name and the partitionkey, 
+                                                                                                            #which we already have set in variables, so just pass those variables in. 
+                                                                                                            #The variable for the partition key we set up needs to have the key hard coded in this case, as the variable only holds the value, not the key
+                                                                                                            #so set up the name of your partition key from your database
+                                                                                                            
+   print("Using those values to .get_item gives us: ", itemWithMetadata) #    for visual understaing only send a log to cloudwatch to see what get_item returns us
+                                                                        #in cloudwatch you will see that when we do .get_item, we get metadata along with the database's keyvalue pair
+                                                                        #
+   itemWithoutMetadata = itemWithMetadata['Item']#make a variable to take what get_item returns us, but only hold the 'Item' key value pair
+   print(".get_item with metadata stripped: ", itemWithoutMetadata)#for visual understanding only send a log to cloudwatch to make sure that we have just the Key value pair of the databse information that we want
+   out['body'] = str(itemWithoutMetadata)#    to go with the other 3 keys, we need the body as our 4th. 
+                                        #to the body key, we attach the key value pair that we were looking for. 
+                                        #It is a dictionary currently, for it to output correctly, we need to convert to string
+                                        
+   print("adding the stripped .get_item value to the body of output variable, so out['body'] is: ", out['body']) #for visual understanding only send a log to cloudwatch to confirm that the body holds the key/value pair we want
+   print("Our entire out variable: ", out) #for visual understanding only send a log to cloudwatch to see what our entire out variable looks like now that it should have all the correct information
+
+   return (out)#return our variable to the client
